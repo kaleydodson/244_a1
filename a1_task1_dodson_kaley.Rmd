@@ -1,0 +1,77 @@
+---
+title: "a1 task1"
+author: "Kaley Dodson"
+date: "1/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(here)
+library(readxl)
+library(lubridate)
+library(RColorBrewer)
+library(patchwork)
+```
+
+```{r}
+# read in data
+sierra_amph <- read_excel(here("data", "sierra_amphibians.xlsx")) 
+```
+
+```{r}
+# wrangling to create first mountain yellow-legged frog subset
+mtn_yl_frog_1 <- sierra_amph %>% 
+  filter(amphibian_life_stage != "EggMass", amphibian_species == "RAMU") %>% # keeps only observations for MYL frogs in all life stages except egg mass
+  mutate(year = year(survey_date)) %>% # creates new column with survey year
+  group_by(year) %>% 
+  count(amphibian_life_stage, wt = amphibian_number) # counts total frogs observed each year by life stage
+
+```
+
+```{r}
+# mtn yellow-legged frog visualization #1
+viz1 <- ggplot(data = mtn_yl_frog_1, aes(x = year, y = n, fill = amphibian_life_stage)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~amphibian_life_stage, scales = "free") +
+  theme_light() +
+  labs(y = "individuals observed") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(values = rev(brewer.pal(3,"Greens")))
+
+```
+
+```{r}
+# wrangling to create second mountain yellow-legged frog subset
+mtn_yl_frog_2 <- sierra_amph %>% 
+  filter(amphibian_life_stage %in% c("Adult", "SubAdult"), amphibian_species == "RAMU") %>% # retains observations for only adult and subadult mountain yellow-legged frogs
+  mutate(dummy_col = "lake") %>% 
+  relocate(dummy_col) %>% 
+  unite("lake_id", dummy_col:lake_id, sep = " ") %>%  # adds text to lake id number for reordering
+  count(lake_id, wt = amphibian_number) %>% # counts total frogs observed in each lake
+  mutate(lake_id = fct_reorder(lake_id, n)) %>% # 
+  slice_max(lake_id, n = 5) # takes top five lakes with highest frog counts
+
+```
+
+```{r}
+# mtn yellow-legged frog visualization #2
+viz2 <- ggplot(data = mtn_yl_frog_2, aes(x = lake_id, y = n, fill = lake_id)) +
+  geom_col(show.legend = FALSE) +
+  labs(y = "individuals observed", x = "lake i.d.") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_light() +
+  scale_fill_brewer(palette = "Blues")
+
+```
+
+```{r, fig.cap="**Figure 1**: Mountain yellow-legged frog counts. (*top*) Total frogs observed each year, by life stage. (*bottom*) Top five lakes with highest numbers of adult and subadult frogs observed from 1995-2002. Data: Knapp, et al. 2020"}
+# final combined visualizations
+final_viz <- viz1 / viz2
+
+final_viz
+
+```
+
